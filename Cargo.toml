@@ -1,0 +1,9 @@
+[package]
+name = "paint-math-rs"
+version = "0.1.0"
+authors = ["Sian Cao <yinshuiboy@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+cairo-rs = {version = "0.6", features = ["png", "pdf"]}
+rand = "0.6"
