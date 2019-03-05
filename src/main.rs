@@ -46,11 +46,7 @@ impl Display for Expr {
                             _ => write!(f, "({})", v2),
                         }
                     },
-                    Op::Div => {
-                        Ok(())
-                    },
-                    Op::Mul => {
-
+                    Op::Div | Op::Mul => {
                         match v1.as_ref() {
                             Single(_) => write!(f, "{}{}", v1, op),
                             Primitive(op2, _, _) | Compound(op2, _, _) => {
@@ -132,20 +128,70 @@ fn eval_expr(e: &Expr) -> i32 {
     }
 }
 
-fn validate_expr(e: &Expr) -> bool {
+trait Validator {
+    fn on_single(&mut self, v: i32) -> bool;
+    fn on_primitive(&mut self, op: Op, v1: i32, v2: i32) -> bool;
+    fn pass(&self) -> bool;
+    fn init(&mut self);
+}
+
+fn validate_expr<V: Validator>(e: &Expr, validator: &mut V) -> bool {
     match e {
-        Single(_) => true,
+        Single(v) => validator.on_single(*v),
+        Primitive(op, v1, v2) => validator.on_primitive(*op, *v1, *v2),
+        Compound(op, v1, v2) => {
+            if validate_expr(v1, validator) && validate_expr(v2, validator) {
+                validate_expr(&Expr::Primitive(*op, eval_expr(v1), eval_expr(v2)), validator)
+            } else {
+                false
+            }
+        }
+    }
+}
+
+struct ValidatorForMySun {
+    has_mul: bool,
+}
+
+impl Validator for ValidatorForMySun {
+    fn on_single(&mut self, v: i32) -> bool {
+        v > 0 && v < 500
+    }
+
+    fn on_primitive(&mut self, op: Op, v1: i32, v2: i32) -> bool {
+        match op {
+            Op::Div => v1 < 100 && v2 < 10  && v2 > 0 && (v1 / v2 < 10) && (v1 % v2 == 0),
+            Op::Mul => {self.has_mul = true; v1 < 10 && v2 < 10},
+            Op::Minus => v1 > v2,
+            _ => true
+        }
+    }
+
+    fn init(&mut self) {
+        self.has_mul = false;
+    }
+
+    fn pass(&self) -> bool {
+        self.has_mul
+    }
+}
+
+//TODO: move policy out
+#[allow(unused)]
+fn validate_expr2(e: &Expr) -> bool {
+    match e {
+        Single(v) => *v > 0 && *v < 500,
         Primitive(op, v1, v2) => {
             match op {
-                Op::Div => *v1 < 100 && *v2 < 10  && *v2 > 0 && (*v1 / *v2 < 10),
+                Op::Div => *v1 < 100 && *v2 < 10  && *v2 > 0 && (*v1 / *v2 < 10) && (*v1 % *v2 == 0),
                 Op::Mul => *v1 < 10 && *v2 < 10,
                 Op::Minus => *v1 > *v2,
                 _ => true
             }
         },
         Compound(op, v1, v2) => {
-            if validate_expr(v1) && validate_expr(v2) {
-                validate_expr(&Expr::Primitive(*op, eval_expr(v1), eval_expr(v2)))
+            if validate_expr2(v1) && validate_expr2(v2) {
+                validate_expr2(&Expr::Primitive(*op, eval_expr(v1), eval_expr(v2)))
             } else {
                 false
             }
@@ -158,33 +204,25 @@ fn validate_expr(e: &Expr) -> bool {
 /// level: 1 => two oprands one op
 /// level: 2 => three oprands two op
 /// level: 3 => four oprands three op
-#[allow(unused)]
-fn generate_rand_math() -> Expr {
-    let mut rng = thread_rng();
-
-    //let level = rng.gen_range(1, 3);
-    let level = 3;
+fn generate_rand_math<V: Validator>(validator: &mut V) -> Expr {
+    let level = 2;
     let (noprand, nop) = (level+1, level);
-
     let mut e: Expr;
+
     loop {
         e = gen_expr(noprand, nop);
-        if validate_expr(&e) {
+        validator.init();
+        if validate_expr(&e, validator) && validator.pass() {
             break;
         }
     }
-    //eprintln!("{:?} => {}", e, e);
-    eprintln!(" {}", e);
+    eprintln!("{:?} => {}", e, e);
     e
 }
 
-fn generate_math(cr: &Context) {
-    let msg = format!("{}={}", generate_rand_math(), " ".repeat(5));
-    cr.show_text(&msg);
-    return;
-
+#[allow(unused)]
+fn generate_math_old(cr: &Context) {
     let mut rng = thread_rng();
-
 
     'out: loop {
         let (mut a, b, c, d) = (
@@ -220,6 +258,13 @@ fn generate_math(cr: &Context) {
     }
 }
 
+fn generate_math(cr: &Context) {
+    let mut validator = ValidatorForMySun { has_mul: false };
+    let msg = format!("{:10}={}", generate_rand_math(&mut validator).to_string(), " ".repeat(5));
+    eprintln!("{}", &msg);
+    cr.show_text(&msg);
+}
+
 #[allow(unused)]
 fn render_page() {
 
@@ -230,7 +275,7 @@ fn render_page() {
     cr.set_source_rgb(0.0, 0.0, 0.0);
     cr.set_font_size(14.0);
 
-    cr.move_to(20.0, 4.0);
+    cr.move_to(20.0, 40.0);
     cr.select_font_face("Noto Sans CJK JP", FontSlant::Normal, FontWeight::Normal);
     let title = format!("{}{}", " ".repeat(60), "四则混合练习题（曹宇轩）");
     cr.show_text(title.as_str());
@@ -244,7 +289,7 @@ fn render_page() {
         cr.select_font_face("Noto Sans CJK JP", FontSlant::Normal, FontWeight::Normal);
         cr.show_text("   日期:________   用时:________  错____个");
 
-        cr.select_font_face("Noto Sans", FontSlant::Normal, FontWeight::Bold);
+        cr.select_font_face("mono", FontSlant::Normal, FontWeight::Bold);
         for r in 0..6 {
             y += 35;
             cr.move_to(20.0, y as f64);
@@ -257,5 +302,5 @@ fn render_page() {
 
 fn main() {
     render_page();
-    //(0..50).for_each(|_| generate_rand_math());
+    //(0..50).for_each(|_| { generate_rand_math(); });
 }
