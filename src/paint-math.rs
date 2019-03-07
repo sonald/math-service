@@ -2,7 +2,7 @@ use mathgen::math::*;
 use cairo::*;
 
 struct ValidatorForMySun {
-    has_mul: bool,
+    has_mul_or_div: bool,
 }
 
 impl Validator for ValidatorForMySun {
@@ -12,19 +12,25 @@ impl Validator for ValidatorForMySun {
 
     fn on_primitive(&mut self, op: Op, v1: i32, v2: i32) -> bool {
         match op {
-            Op::Div => v1 < 100 && v2 < 10  && v2 > 0 && (v1 / v2 < 10) && (v1 % v2 == 0),
-            Op::Mul => {self.has_mul = true; v1 < 10 && v2 < 10},
+            Op::Div => {
+                self.has_mul_or_div = true;
+                v1 < 100 && v2 < 10  && v2 > 0 && (v1 / v2 < 10) && (v1 % v2 == 0)
+            },
+            Op::Mul => {
+                self.has_mul_or_div = true;
+                v1 < 10 && v2 < 10
+            },
             Op::Minus => v1 > v2,
             _ => true
         }
     }
 
     fn init(&mut self) {
-        self.has_mul = false;
+        self.has_mul_or_div = false;
     }
 
     fn pass(&self) -> bool {
-        self.has_mul
+        self.has_mul_or_div
     }
 }
 
@@ -50,7 +56,7 @@ fn generate_rand_math<V: Validator>(validator: &mut V) -> Expr {
 }
 
 fn generate_math(cr: &Context) {
-    let mut validator = ValidatorForMySun { has_mul: false };
+    let mut validator = ValidatorForMySun { has_mul_or_div: false };
     let msg = format!("{:10}={}", generate_rand_math(&mut validator).to_string(), " ".repeat(5));
     //eprintln!("{}", &msg);
     cr.show_text(&msg);
@@ -82,7 +88,7 @@ fn render_page<T: AsRef<str>>(title: T) {
 
         cr.select_font_face("mono", FontSlant::Normal, FontWeight::Bold);
         for r in 0..6 {
-            y += 25;
+            y += 35;
             cr.move_to(20.0, y as f64);
             for i in 0..4 {
                 generate_math(&cr);
@@ -98,4 +104,3 @@ fn main() {
     });
     //(0..50).for_each(|_| { generate_rand_math(); });
 }
-
