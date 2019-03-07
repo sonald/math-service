@@ -1,9 +1,27 @@
 [package]
-name = "paint-math-rs"
+name = "mathgen"
 version = "0.1.0"
 authors = ["Sian Cao <yinshuiboy@gmail.com>"]
 edition = "2018"
 
+[[bin]]
+name = "paint-math"
+path = "src/paint-math.rs"
+
+[[bin]]
+name = "paint-service"
+path = "src/main.rs"
+
 [dependencies]
+clap = "*"
 cairo-rs = {version = "0.6", features = ["png", "pdf"]}
 rand = "0.6"
+actix-web = "0.7"
+env_logger = "0.5"
+log = "0.4"
+
+diesel = {version = "1.0", features = ["postgres", "sqlite"]}
+dotenv = "*"
+
+r2d2 = "0.8.2"
+r2d2-diesel = "1.0.0"
