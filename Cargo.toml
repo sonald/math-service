@@ -6,7 +6,7 @@ edition = "2018"
 
 [[bin]]
 name = "paint-math"
-path = "src/paint-math.rs"
+path = "src/paint_math.rs"
 
 [[bin]]
 name = "paint-service"
@@ -18,10 +18,10 @@ cairo-rs = {version = "0.6", features = ["png", "pdf"]}
 rand = "0.6"
 actix-web = "0.7"
 env_logger = "0.5"
+dotenv = "0.13"
 log = "0.4"
 
 diesel = {version = "1.0", features = ["postgres", "sqlite"]}
-dotenv = "*"
 
 r2d2 = "0.8.2"
 r2d2-diesel = "1.0.0"

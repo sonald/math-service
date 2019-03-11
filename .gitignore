@@ -2,3 +2,5 @@
 **/*.rs.bk
 .vim-undo
 *.pdf
+.zcache
+*.png

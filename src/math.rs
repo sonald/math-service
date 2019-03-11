@@ -1,7 +1,6 @@
 use rand::prelude::*;
 use std::fmt::*;
 
-#[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
     Add,
@@ -21,7 +20,6 @@ impl Display for Op {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug, Clone)]
 pub enum Expr {
     Single(i32),
@@ -29,7 +27,6 @@ pub enum Expr {
     Compound(Op, Box<Expr>, Box<Expr>)
 }
 
-//(axb-3)x(cxd)
 /// render Expr with least brackets required 
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter) -> Result {
@@ -40,7 +37,19 @@ impl Display for Expr {
                 match op {
                     Op::Add => write!(f, "{}{}{}", v1, op, v2),
                     Op::Minus => {
+                        //match v1.as_ref() {
+                            //Primitive(op2, _, _) | Compound(op2, _, _) => {
+                                //if *op2 == Op::Div || *op2 == Op::Mul {
+                                    //write!(f, "({}){}", v1, op)
+                                //} else {
+                                    //write!(f, "{}{}", v1, op)
+                                //}
+                            //},
+
+                        //}?;
+
                         write!(f, "{}{}", v1, op)?;
+
                         match v2.as_ref() {
                             Single(_) => write!(f, "{}", v2),
                             Primitive(op2, _, _) | Compound(op2, _, _) => {
@@ -68,7 +77,7 @@ impl Display for Expr {
                             Single(_) => write!(f, "{}", v2),
                             Primitive(op2, _, _) | Compound(op2, _, _) => {
                                 if *op2 == Op::Add || *op2 == Op::Minus {
-                                    write!(f, "{}", v2)
+                                    write!(f, "({})", v2)
                                 } else {
                                     write!(f, "{}", v2)
                                 }
@@ -95,7 +104,7 @@ fn rand_op() -> Op {
     }
 }
 
-pub fn gen_expr(mut noprand: i32, mut nop: i32) -> Expr {
+pub fn gen_expr(noprand: i32, nop: i32) -> Expr {
     let mut rng = thread_rng();
 
     match (noprand, nop) {
