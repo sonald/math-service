@@ -1,6 +1,7 @@
 use super::math::*;
 use cairo::*;
 use std::fs::File;
+use log::*;
 
 pub struct ValidatorForMySon {
     pub has_mul_or_div: bool,
@@ -77,10 +78,7 @@ impl<V> Configuration<V> where V: Validator {
         cr.show_text(&msg);
     }
 
-    pub fn render_page<T: AsRef<str>>(&mut self, name: T) {
-
-        let target = pdf::File::new(8.3 * 72.0, 11.7 * 72.0, name.as_ref());
-
+    pub fn render_page(&mut self, target: &Surface) {
         let cr = Context::new(&target);
         cr.set_antialias(Antialias::Subpixel);
         cr.set_source_rgb(0.0, 0.0, 0.0);
@@ -109,39 +107,27 @@ impl<V> Configuration<V> where V: Validator {
         }
     }
 
+    pub fn render_pdf<T: AsRef<str>>(&mut self, name: T) {
+        let target = pdf::File::new(8.3 * 72.0, 11.7 * 72.0, name.as_ref());
+        self.render_page(&target);
+    }
+
+    pub fn render_pdf_to_stream(&mut self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        
+        let target = pdf::Writer::new(8.3 * 72.0, 11.7 * 72.0, &mut buf);
+        self.render_page(&target);
+        target.finish();
+
+        debug!("render_pdf_to_stream: size = {}", buf.len());
+
+        buf
+    }
+
     pub fn render_png<T: AsRef<str>>(&mut self, name: T) {
         // A4 @72dpi = 595x842
         let target = ImageSurface::create(Format::ARgb32, 595, 842).unwrap();
-
-        let cr = Context::new(&target);
-        cr.set_antialias(Antialias::Best);
-        cr.set_source_rgba(0.0, 0.0, 0.0, 1.0);
-        cr.set_font_size(14.0);
-
-        cr.move_to(20.0, 40.0);
-        cr.select_font_face("Noto Sans CJK JP", FontSlant::Normal, FontWeight::Normal);
-        let title = format!("{}{}", " ".repeat(60), self.title);
-        cr.show_text(title.as_str());
-
-        let mut y = 30;
-
-        for _ in 0..3 {
-            y += 50;
-            cr.move_to(20.0, y as f64);
-
-            cr.select_font_face("Noto Sans CJK JP", FontSlant::Normal, FontWeight::Normal);
-            cr.show_text("   日期:________   用时:________  错____个");
-
-            cr.select_font_face("mono", FontSlant::Normal, FontWeight::Bold);
-            for _ in 0..6 {
-                y += 35;
-                cr.move_to(20.0, y as f64);
-                (0..4).for_each(|_| self.generate_math(&cr) );
-            }
-        }
-
-        let mut buf = Vec::new();
-        target.write_to_png(&mut buf).ok();
+        self.render_page(&target);
 
         if let Ok(mut f) = File::create(String::from(name.as_ref())) {
             target.write_to_png(&mut f).ok();
@@ -151,37 +137,7 @@ impl<V> Configuration<V> where V: Validator {
     pub fn render_png_to_stream(&mut self) -> Vec<u8> {
         // A4 @72dpi = 595x842
         let target = ImageSurface::create(Format::ARgb32, 595, 842).unwrap();
-
-        let cr = Context::new(&target);
-        cr.set_antialias(Antialias::Best);
-
-        cr.set_source_rgba(1.0, 0.0, 1.0, 1.0);
-        cr.fill();
-
-        cr.set_source_rgba(0.0, 0.0, 0.0, 1.0);
-        cr.set_font_size(14.0);
-
-        cr.move_to(20.0, 40.0);
-        cr.select_font_face("Noto Sans CJK JP", FontSlant::Normal, FontWeight::Normal);
-        let title = format!("{}{}", " ".repeat(60), self.title);
-        cr.show_text(title.as_str());
-
-        let mut y = 30;
-
-        for _ in 0..3 {
-            y += 50;
-            cr.move_to(20.0, y as f64);
-
-            cr.select_font_face("Noto Sans CJK JP", FontSlant::Normal, FontWeight::Normal);
-            cr.show_text("   日期:________   用时:________  错____个");
-
-            cr.select_font_face("mono", FontSlant::Normal, FontWeight::Bold);
-            for _ in 0..6 {
-                y += 35;
-                cr.move_to(20.0, y as f64);
-                (0..4).for_each(|_| self.generate_math(&cr) );
-            }
-        }
+        self.render_page(&target);
 
         let mut buf = Vec::new();
         target.write_to_png(&mut buf).ok();

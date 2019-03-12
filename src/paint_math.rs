@@ -9,7 +9,7 @@ fn main() {
 
     (0..10).for_each(|i| { 
         let s = format!("math{}.pdf", i);
-        cfg.render_page(&s); 
+        cfg.render_pdf(&s); 
     });
     let s = format!("math.png");
     cfg.render_png(s); 

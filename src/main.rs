@@ -45,11 +45,13 @@ fn index(req: &HttpRequest<MathState>) -> impl Responder {
 }
 
 fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut body = Vec::new();
+    let mut cfg = Configuration {
+        validator: ValidatorForMySon {has_mul_or_div: false},
+        title: "四则混合练习题".to_string(),
+        level: 2
+    };
 
-    let mut f = File::open("math.pdf").expect("open failed");
-    f.read_to_end(&mut body).ok();
-    debug!("generate_math_pdf, read {}", body.len());
+    let body = cfg.render_pdf_to_stream(); 
 
     HttpResponse::Ok()
         .content_type("application/pdf")
