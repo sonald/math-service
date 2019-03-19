@@ -1,11 +1,15 @@
-use actix_web::{server, Responder, http, HttpRequest, HttpResponse, App};
-use std::fs::File;
-use std::io::prelude::*;
-use std::vec::Vec;
+use actix_web::{server, Result, Error, Responder, http, HttpRequest, HttpResponse, App, fs::NamedFile};
+use actix_web::{HttpMessage, AsyncResponder};
+use actix_web::error::ErrorNotFound;
 
 use log::*;
 use std::cell::Cell;
 use dotenv::dotenv;
+
+//use serde::Deserialize;
+#[macro_use] extern crate serde_derive;
+
+use futures::future::{Future, ok};
 
 use mathgen::paint::*;
 
@@ -13,9 +17,16 @@ struct MathState {
     requests: Cell<i32>,
 }
 
+#[derive(Deserialize)]
+struct GenerateFormData {
+    title: String,
+    level: i32,
+    kinds: String
+}
+
 impl MathState {
     fn new() -> MathState {
-        debug!("create new state");
+        info!("create new state");
 
         MathState {
             requests: Cell::new(0)
@@ -28,8 +39,20 @@ impl MathState {
     }
 }
 
-fn index(req: &HttpRequest<MathState>) -> impl Responder {
-    debug!("get index");
+fn index(_: &HttpRequest<MathState>) -> Result<NamedFile> {
+    info!("get index");
+
+    if cfg!(feature = "service") {
+        Ok(NamedFile::open("/web/api.sonald.me/index.html")?)
+    } else if cfg!(feature = "local") {
+        Ok(NamedFile::open("./index.html")?)
+    } else {
+        Err(ErrorNotFound("format is not supported"))
+    }
+}
+
+fn index2(req: &HttpRequest<MathState>) -> impl Responder {
+    info!("get index");
 
     req.state().incr();
 
@@ -42,6 +65,32 @@ fn index(req: &HttpRequest<MathState>) -> impl Responder {
     resp.headers_mut().insert(http::header::CONTENT_TYPE, "text/html".parse().unwrap());
 
     resp
+}
+
+fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse, Error=Error>> {
+    info!("handle_generate");
+
+    req.urlencoded::<GenerateFormData>()
+        .from_err()
+        .and_then(|fd: GenerateFormData| {
+            info!("form: (title = {}, level = {}, kind = {})", fd.title, fd.level, fd.kinds);
+
+            let mut cfg = Configuration {
+                validator: ValidatorForMySon {has_mul_or_div: false},
+                title: fd.title,
+                level: fd.level
+            };
+
+            let (body, ct) = match fd.kinds.as_ref() {
+                "pdf" => (cfg.render_pdf_to_stream(), "application/pdf"),
+                _ => (cfg.render_png_to_stream(), "image/png")
+            };
+
+            ok(HttpResponse::Ok().content_type(ct).body(body))
+
+
+        })
+        .responder()
 }
 
 fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
@@ -67,7 +116,7 @@ fn generate_math_png(_: &HttpRequest<MathState>) -> impl Responder {
 
     let body = cfg.render_png_to_stream(); 
 
-    debug!("generate_math_png, read {}", body.len());
+    info!("generate_math_png, read {}", body.len());
 
     HttpResponse::Ok()
         .content_type("image/png")
@@ -79,14 +128,19 @@ fn main() {
 
     env_logger::init();
 
-    server::new(|| App::with_state(MathState::new())
+    let serv = server::new(|| App::with_state(MathState::new())
                 .prefix("/apps/math")
-                .resource("/", |r| r.method(http::Method::GET).f(index))
+                .resource("/", |r| {
+                    r.method(http::Method::POST).f(handle_generate);
+                    r.method(http::Method::GET).f(index)
+                })
                 .resource("/pdf", |r| r.method(http::Method::GET).f(generate_math))
-                .resource("/png", |r| r.method(http::Method::GET).f(generate_math_png)))
-        //.bind("127.0.0.1:8080")
-        .bind("0.0.0.0:8080")
-        .unwrap()
-        .run();
+                .resource("/png", |r| r.method(http::Method::GET).f(generate_math_png)));
+
+    if cfg!(feature = "service") {
+        serv.bind("127.0.0.1:8080").unwrap().run();
+    } else if cfg!(feature = "local") {
+        serv.bind("0.0.0.0:8080").unwrap().run();
+    }
 
 }

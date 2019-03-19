@@ -12,6 +12,12 @@ path = "src/paint_math.rs"
 name = "paint-service"
 path = "src/main.rs"
 
+[features]
+default = ["local"]
+
+local = []
+service = []
+
 [dependencies]
 clap = "*"
 cairo-rs = {version = "0.6", features = ["png", "pdf"]}
@@ -25,3 +31,8 @@ diesel = {version = "1.0", features = ["postgres", "sqlite"]}
 
 r2d2 = "0.8.2"
 r2d2-diesel = "1.0.0"
+
+serde = "*"
+serde_derive = "*"
+
+futures = "*"

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <style type="text/css">
+      html,body {
+      height: 100%;
+      background-color: #333;
+      color: white;
+    }
+
+    </style>
+    
+    
+    <title>Math Fun</title>
+  </head>
+
+  <body class="text-center">
+
+    <div class="container d-flex w-100 h-100 p-3 mx-auto flex-column ">
+      <header class="mb-auto"></header>
+
+      <main role="main" class="inner ">
+        <h1 class="cover-heading">Math Exam Generator</h1>
+        
+        <div class="mx-auto">
+          <form action="/apps/math/" method="POST" enctype="application/x-www-form-urlencoded">
+            <div class="form-group row justify-content-center">
+              <label class="col-sm-1 col-form-label" for="title"> Title </label>
+
+              <div class="col-sm-4">
+                <input type="text" class="form-control" id="title" name="title" 
+                  placeholder="Enter title"
+                  value="四则混合运算练习题">
+              </div>
+            </div>
+
+            <div class="form-group row justify-content-center">
+              <label class="col-sm-1 col-form-label" for="level"> Level </label>
+              <div class="col-sm-4">
+                <input type="text" class="form-control" id="level" name="level" 
+                  placeholder="Enter level" value="2">
+              </div>
+            </div>   
+
+            <div class="form-group row justify-content-center">
+              <span class="col-sm-1">type</span>
+
+              <div class="col-sm-1 form-check">
+                <input class="form-check-input" type="radio" name="kinds" id="kindPDF" value="pdf" checked>
+                <label class="form-check-label" for="kindPDF">PDF</label>
+              </div>
+
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kinds" id="kindPNG" value="png">
+                <label class="form-check-label" for="kindPDF">PNG</label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Generate</button>         
+          </form>
+        </div>
+
+        <p class="lead p-3">
+          <span>or with defaults: </span>
+          <a href="pdf" class="btn btn btn-lg btn-info">pdf</a>
+          <a href="png" class="btn btn-lg btn-success">png</a>          
+        </p>
+      </main>
+
+      <footer class="mt-auto"> </footer>
+    </div>
+
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  </body>
+</html>
