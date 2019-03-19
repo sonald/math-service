@@ -37,17 +37,6 @@ impl Display for Expr {
                 match op {
                     Op::Add => write!(f, "{}{}{}", v1, op, v2),
                     Op::Minus => {
-                        //match v1.as_ref() {
-                            //Primitive(op2, _, _) | Compound(op2, _, _) => {
-                                //if *op2 == Op::Div || *op2 == Op::Mul {
-                                    //write!(f, "({}){}", v1, op)
-                                //} else {
-                                    //write!(f, "{}{}", v1, op)
-                                //}
-                            //},
-
-                        //}?;
-
                         write!(f, "{}{}", v1, op)?;
 
                         match v2.as_ref() {
@@ -76,7 +65,7 @@ impl Display for Expr {
                         match v2.as_ref() {
                             Single(_) => write!(f, "{}", v2),
                             Primitive(op2, _, _) | Compound(op2, _, _) => {
-                                if *op2 == Op::Add || *op2 == Op::Minus {
+                                if *op2 == Op::Add || *op2 == Op::Minus || *op == Op::Div {
                                     write!(f, "({})", v2)
                                 } else {
                                     write!(f, "{}", v2)
