@@ -78,10 +78,11 @@ fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse
             fd.title, fd.level, fd.range, fd.kind);
 
             let mut cfg = Configuration {
-                validator: ValidatorForMySon {has_mul_or_div: false},
                 title: fd.title,
                 level: fd.level,
-                range: 0..fd.range
+                single_range: 0..200,
+                result_range: 0..fd.range,
+                addition_range: 0..200,
             };
 
             let (body, ct) = match fd.kind.as_ref() {
@@ -98,10 +99,11 @@ fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse
 
 fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
     let mut cfg = Configuration {
-        validator: ValidatorForMySon {has_mul_or_div: false},
         title: "四则混合练习题".to_string(),
         level: 2,
-        range: 0..200
+        single_range: 0..200,
+        result_range: 0..200,
+        addition_range: 0..200,
     };
 
     let body = cfg.render_pdf_to_stream(); 
@@ -112,14 +114,15 @@ fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
 }
 
 fn generate_math_png(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut cfg = Configuration {
-        validator: ValidatorForMySon {has_mul_or_div: false},
+    let mut conf = Configuration {
         title: "四则混合练习题".to_string(),
         level: 2,
-        range: 0..200
+        single_range: 0..200,
+        result_range: 0..200,
+        addition_range: 0..200,
     };
 
-    let body = cfg.render_png_to_stream(); 
+    let body = conf.render_png_to_stream(); 
 
     info!("generate_math_png, read {}", body.len());
 

@@ -6,7 +6,7 @@ pub enum Op {
     Add,
     Minus,
     Mul,
-    Div
+    Div,
 }
 
 impl Display for Op {
@@ -24,57 +24,54 @@ impl Display for Op {
 pub enum Expr {
     Single(i32),
     Primitive(Op, i32, i32),
-    Compound(Op, Box<Expr>, Box<Expr>)
+    Compound(Op, Box<Expr>, Box<Expr>),
 }
 
-/// render Expr with least brackets required 
+/// render Expr with least brackets required
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             Single(v) => write!(f, "{}", v),
             Primitive(op, v1, v2) => write!(f, "{}{}{}", v1, op, v2),
-            Compound(op, v1, v2) => {
-                match op {
-                    Op::Add => write!(f, "{}{}{}", v1, op, v2),
-                    Op::Minus => {
-                        write!(f, "{}{}", v1, op)?;
+            Compound(op, v1, v2) => match op {
+                Op::Add => write!(f, "{}{}{}", v1, op, v2),
+                Op::Minus => {
+                    write!(f, "{}{}", v1, op)?;
 
-                        match v2.as_ref() {
-                            Single(_) => write!(f, "{}", v2),
-                            Primitive(op2, _, _) | Compound(op2, _, _) => {
-                                if *op2 == Op::Add || *op2 == Op::Minus {
-                                    write!(f, "({})", v2)
-                                } else {
-                                    write!(f, "{}", v2)
-                                }
-                            },
+                    match v2.as_ref() {
+                        Single(_) => write!(f, "{}", v2),
+                        Primitive(op2, _, _) | Compound(op2, _, _) => {
+                            if *op2 == Op::Add || *op2 == Op::Minus {
+                                write!(f, "({})", v2)
+                            } else {
+                                write!(f, "{}", v2)
+                            }
                         }
-                    },
-                    Op::Div | Op::Mul => {
-                        match v1.as_ref() {
-                            Single(_) => write!(f, "{}{}", v1, op),
-                            Primitive(op2, _, _) | Compound(op2, _, _) => {
-                                if *op2 == Op::Add || *op2 == Op::Minus {
-                                    write!(f, "({}){}", v1, op)
-                                } else {
-                                    write!(f, "{}{}", v1, op)
-                                }
-                            },
-                        }?;
-
-                        match v2.as_ref() {
-                            Single(_) => write!(f, "{}", v2),
-                            Primitive(op2, _, _) | Compound(op2, _, _) => {
-                                if *op2 == Op::Add || *op2 == Op::Minus || *op == Op::Div {
-                                    write!(f, "({})", v2)
-                                } else {
-                                    write!(f, "{}", v2)
-                                }
-                            },
-                        }
-                    },
+                    }
                 }
+                Op::Div | Op::Mul => {
+                    match v1.as_ref() {
+                        Single(_) => write!(f, "{}{}", v1, op),
+                        Primitive(op2, _, _) | Compound(op2, _, _) => {
+                            if *op2 == Op::Add || *op2 == Op::Minus {
+                                write!(f, "({}){}", v1, op)
+                            } else {
+                                write!(f, "{}{}", v1, op)
+                            }
+                        }
+                    }?;
 
+                    match v2.as_ref() {
+                        Single(_) => write!(f, "{}", v2),
+                        Primitive(op2, _, _) | Compound(op2, _, _) => {
+                            if *op2 == Op::Add || *op2 == Op::Minus || *op == Op::Div {
+                                write!(f, "({})", v2)
+                            } else {
+                                write!(f, "{}", v2)
+                            }
+                        }
+                    }
+                }
             },
         }
     }
@@ -89,45 +86,60 @@ fn rand_op() -> Op {
         1 => Op::Minus,
         2 => Op::Mul,
         3 => Op::Div,
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
-pub fn gen_expr(noprand: i32, nop: i32) -> Expr {
-    let mut rng = thread_rng();
+impl Expr {
+    pub fn gen(noprand: i32, nop: i32) -> Expr {
+        let mut rng = thread_rng();
 
-    match (noprand, nop) {
-        (1, 0) => Single(rng.gen_range(1, 100)),
-        (2, 1) => Primitive(rand_op(), rng.gen_range(1, 200), rng.gen_range(1, 200)),
-        _ => {
+        match (noprand, nop) {
+            (1, 0) => Single(rng.gen_range(1, 200)),
+            (2, 1) => Primitive(rand_op(), rng.gen_range(1, 200), rng.gen_range(1, 200)),
+            _ => {
+                let lnoprand = rng.gen_range(1, noprand);
+                let rnoprand = noprand - lnoprand;
 
-            let lnoprand = rng.gen_range(1, noprand);
-            let rnoprand = noprand - lnoprand;
+                let lhs = Expr::gen(lnoprand, lnoprand - 1);
+                let rhs = Expr::gen(rnoprand, rnoprand - 1);
 
-            let lhs = gen_expr(lnoprand, lnoprand-1);
-            let rhs = gen_expr(rnoprand, rnoprand-1);
-
-            //assert!()
-
-            Compound(rand_op(), Box::new(lhs), Box::new(rhs))
-        },
+                Compound(rand_op(), Box::new(lhs), Box::new(rhs))
+            }
+        }
     }
-}
 
-pub fn eval_expr(e: &Expr) -> i32 {
-    match e {
-        Single(v) => *v,
-        Primitive(op, v1, v2) => match op {
-            Op::Div => *v1 / *v2,
-            Op::Mul => *v1 * *v2,
-            Op::Minus => *v1 - *v2,
-            _ => *v1 + *v2,
-        },
-        Compound(op, v1, v2) => match op {
-            Op::Div => eval_expr(v1) / eval_expr(v2),
-            Op::Mul => eval_expr(v1) * eval_expr(v2),
-            Op::Minus => eval_expr(v1) - eval_expr(v2),
-            _ => eval_expr(v1) + eval_expr(v2),
+    pub fn eval(&self) -> i32 {
+        match self {
+            Single(v) => *v,
+            Primitive(op, v1, v2) => match op {
+                Op::Div => *v1 / *v2,
+                Op::Mul => *v1 * *v2,
+                Op::Minus => *v1 - *v2,
+                _ => *v1 + *v2,
+            },
+            Compound(op, v1, v2) => match op {
+                Op::Div => v1.eval() / v2.eval(),
+                Op::Mul => v1.eval() * v2.eval(),
+                Op::Minus => v1.eval() - v2.eval(),
+                _ => v1.eval() + v2.eval(),
+            },
+        }
+    }
+
+    pub fn validate<V: Validator>(&self, validator: &mut V) -> bool {
+        match self {
+            Single(v) => validator.on_single(*v),
+            Primitive(op, v1, v2) => {
+                validator.on_single(*v1)
+                    && validator.on_single(*v2)
+                    && validator.on_primitive(*op, *v1, *v2)
+            }
+            Compound(op, v1, v2) => {
+                v1.validate(validator)
+                    && v2.validate(validator)
+                    && Expr::Primitive(*op, v1.eval(), v2.eval()).validate(validator)
+            }
         }
     }
 }
@@ -138,18 +150,3 @@ pub trait Validator {
     fn pass(&self) -> bool;
     fn init(&mut self);
 }
-
-pub fn validate_expr<V: Validator>(e: &Expr, validator: &mut V) -> bool {
-    match e {
-        Single(v) => validator.on_single(*v),
-        Primitive(op, v1, v2) => validator.on_primitive(*op, *v1, *v2),
-        Compound(op, v1, v2) => {
-            if validate_expr(v1, validator) && validate_expr(v2, validator) {
-                validate_expr(&Expr::Primitive(*op, eval_expr(v1), eval_expr(v2)), validator)
-            } else {
-                false
-            }
-        }
-    }
-}
-

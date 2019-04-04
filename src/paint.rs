@@ -1,30 +1,52 @@
 use super::math::*;
 use cairo::*;
-use std::fs::File;
 use log::*;
+use std::fs::File;
 use std::ops::Range;
 
-pub struct ValidatorForMySon {
+#[derive(Debug)]
+pub struct Configuration {
+    pub title: String,
+    pub level: i32,
+    pub result_range: Range<i32>,
+    pub single_range: Range<i32>,
+    pub addition_range: Range<i32>,
+}
+
+pub struct ValidatorForMySon<'a> {
+    cfg: &'a Configuration,
     pub has_mul_or_div: bool,
 }
 
-impl Validator for ValidatorForMySon {
+impl<'a> Validator for ValidatorForMySon<'a> {
     fn on_single(&mut self, v: i32) -> bool {
-        v > 0 && v < 100
+        v >= self.cfg.single_range.start && v < self.cfg.single_range.end
     }
 
     fn on_primitive(&mut self, op: Op, v1: i32, v2: i32) -> bool {
         match op {
             Op::Div => {
                 self.has_mul_or_div = true;
-                v1 < 100 && v2 < 10  && v2 > 1 && (v1 / v2 < 10) && (v1 % v2 == 0)
-            },
+                v1 < 100 && v2 < 10 && v2 > 1 && (v1 / v2 < 10) && (v1 % v2 == 0)
+            }
             Op::Mul => {
                 self.has_mul_or_div = true;
-                v1 < 10 && 1 < v1 && 1 < v2 && v2 < 10
-            },
-            Op::Minus => v1 > v2,
-            _ => true
+                v1 < 20 && 4 < v1 && 4 < v2 && v2 < 20
+            }
+            Op::Minus => {
+                v1 >= self.cfg.addition_range.start
+                    && v1 < self.cfg.addition_range.end
+                    && v2 >= self.cfg.addition_range.start
+                    && v2 < self.cfg.addition_range.end
+                    && v1 > v2
+            }
+
+            _ => {
+                v1 >= self.cfg.addition_range.start
+                    && v1 < self.cfg.addition_range.end
+                    && v2 >= self.cfg.addition_range.start
+                    && v2 < self.cfg.addition_range.end
+            }
         }
     }
 
@@ -37,24 +59,7 @@ impl Validator for ValidatorForMySon {
     }
 }
 
-
-#[derive(Debug)]
-pub struct Configuration<V> {
-    pub validator: V,
-    pub title: String,
-    pub level: i32,
-    pub range: Range<i32>,
-}
-
-impl<V> Configuration<V> where V: Validator {
-    pub fn basic(v: V) -> Self {
-        Configuration {
-            validator: v,
-            title: "".to_string(),
-            level: 2,
-            range: 10..200
-        }
-    }
+impl Configuration {
     /// generate random math expression
     /// 1 2 3 + * => 1 * (2+3)
     /// level: 1 => two oprands one op
@@ -62,27 +67,35 @@ impl<V> Configuration<V> where V: Validator {
     /// level: 3 => four oprands three op
     pub fn generate_rand_math(&mut self) -> Expr {
         let level = self.level;
-        let (noprand, nop) = (level+1, level);
+        let (noprand, nop) = (level + 1, level);
         let mut e: Expr;
 
+        let mut validator = ValidatorForMySon {
+            cfg: &self,
+            has_mul_or_div: false,
+        };
         loop {
-            e = gen_expr(noprand, nop);
-            self.validator.init();
-            if validate_expr(&e, &mut self.validator) && self.validator.pass() {
-                let ev = eval_expr(&e);
-                if self.range.start <= ev && ev <= self.range.end {
-                    break;
+            e = Expr::gen(noprand, nop);
+            validator.init();
+            if e.validate(&mut validator) && validator.pass() {
+                match e.eval() {
+                    ev if self.result_range.start <= ev && ev <= self.result_range.end => {
+                        break;
+                    }
+                    _ => {}
                 }
             }
-
-
         }
         //eprintln!("{:?} => {}", e, e);
         e
     }
 
     pub fn generate_math(&mut self, cr: &Context) {
-        let msg = format!("{:10}={}", self.generate_rand_math().to_string(), " ".repeat(5));
+        let msg = format!(
+            "{:10}={}",
+            self.generate_rand_math().to_string(),
+            " ".repeat(5)
+        );
         //eprintln!("{}", &msg);
         cr.show_text(&msg);
     }
@@ -111,7 +124,7 @@ impl<V> Configuration<V> where V: Validator {
             for _ in 0..6 {
                 y += 35;
                 cr.move_to(20.0, y as f64);
-                (0..4).for_each(|_| self.generate_math(&cr) );
+                (0..4).for_each(|_| self.generate_math(&cr));
             }
         }
     }
@@ -123,7 +136,7 @@ impl<V> Configuration<V> where V: Validator {
 
     pub fn render_pdf_to_stream(&mut self) -> Vec<u8> {
         let mut buf = Vec::new();
-        
+
         let target = pdf::Writer::new(8.3 * 72.0, 11.7 * 72.0, &mut buf);
         self.render_page(&target);
         target.finish();
@@ -152,5 +165,4 @@ impl<V> Configuration<V> where V: Validator {
         target.write_to_png(&mut buf).ok();
         buf
     }
-
 }
