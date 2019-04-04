@@ -6,11 +6,11 @@ edition = "2018"
 
 [[bin]]
 name = "paint-math"
-path = "src/paint_math.rs"
+path = "src/bin/paint_math.rs"
 
 [[bin]]
 name = "paint-service"
-path = "src/main.rs"
+path = "src/bin/paint_service.rs"
 
 [features]
 default = ["local"]

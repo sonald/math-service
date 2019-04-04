@@ -98,7 +98,7 @@ pub fn gen_expr(noprand: i32, nop: i32) -> Expr {
 
     match (noprand, nop) {
         (1, 0) => Single(rng.gen_range(1, 100)),
-        (2, 1) => Primitive(rand_op(), rng.gen_range(1, 100), rng.gen_range(1, 100)),
+        (2, 1) => Primitive(rand_op(), rng.gen_range(1, 200), rng.gen_range(1, 200)),
         _ => {
 
             let lnoprand = rng.gen_range(1, noprand);

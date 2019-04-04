@@ -21,7 +21,8 @@ struct MathState {
 struct GenerateFormData {
     title: String,
     level: i32,
-    kinds: String
+    range: i32,
+    kind: String
 }
 
 impl MathState {
@@ -73,15 +74,17 @@ fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse
     req.urlencoded::<GenerateFormData>()
         .from_err()
         .and_then(|fd: GenerateFormData| {
-            info!("form: (title = {}, level = {}, kind = {})", fd.title, fd.level, fd.kinds);
+            info!("form: (title = {}, level = {}, range = {}, kind = {})",
+            fd.title, fd.level, fd.range, fd.kind);
 
             let mut cfg = Configuration {
                 validator: ValidatorForMySon {has_mul_or_div: false},
                 title: fd.title,
-                level: fd.level
+                level: fd.level,
+                range: 0..fd.range
             };
 
-            let (body, ct) = match fd.kinds.as_ref() {
+            let (body, ct) = match fd.kind.as_ref() {
                 "pdf" => (cfg.render_pdf_to_stream(), "application/pdf"),
                 _ => (cfg.render_png_to_stream(), "image/png")
             };
@@ -97,7 +100,8 @@ fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
     let mut cfg = Configuration {
         validator: ValidatorForMySon {has_mul_or_div: false},
         title: "四则混合练习题".to_string(),
-        level: 2
+        level: 2,
+        range: 0..200
     };
 
     let body = cfg.render_pdf_to_stream(); 
@@ -111,7 +115,8 @@ fn generate_math_png(_: &HttpRequest<MathState>) -> impl Responder {
     let mut cfg = Configuration {
         validator: ValidatorForMySon {has_mul_or_div: false},
         title: "四则混合练习题".to_string(),
-        level: 2
+        level: 2,
+        range: 0..200
     };
 
     let body = cfg.render_png_to_stream(); 

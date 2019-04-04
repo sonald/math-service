@@ -2,6 +2,7 @@ use super::math::*;
 use cairo::*;
 use std::fs::File;
 use log::*;
+use std::ops::Range;
 
 pub struct ValidatorForMySon {
     pub has_mul_or_div: bool,
@@ -9,7 +10,7 @@ pub struct ValidatorForMySon {
 
 impl Validator for ValidatorForMySon {
     fn on_single(&mut self, v: i32) -> bool {
-        v > 0 && v < 500
+        v > 0 && v < 100
     }
 
     fn on_primitive(&mut self, op: Op, v1: i32, v2: i32) -> bool {
@@ -36,11 +37,13 @@ impl Validator for ValidatorForMySon {
     }
 }
 
+
 #[derive(Debug)]
 pub struct Configuration<V> {
     pub validator: V,
     pub title: String,
-    pub level: i32
+    pub level: i32,
+    pub range: Range<i32>,
 }
 
 impl<V> Configuration<V> where V: Validator {
@@ -48,7 +51,8 @@ impl<V> Configuration<V> where V: Validator {
         Configuration {
             validator: v,
             title: "".to_string(),
-            level: 2
+            level: 2,
+            range: 10..200
         }
     }
     /// generate random math expression
@@ -65,8 +69,13 @@ impl<V> Configuration<V> where V: Validator {
             e = gen_expr(noprand, nop);
             self.validator.init();
             if validate_expr(&e, &mut self.validator) && self.validator.pass() {
-                break;
+                let ev = eval_expr(&e);
+                if self.range.start <= ev && ev <= self.range.end {
+                    break;
+                }
             }
+
+
         }
         //eprintln!("{:?} => {}", e, e);
         e
