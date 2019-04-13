@@ -4,6 +4,21 @@ use log::*;
 use std::fs::File;
 use std::ops::Range;
 
+trait Contains {
+    type Item;
+    fn has(&self, v: Self::Item) -> bool;
+}
+
+impl<T> Contains for Range<T>
+where
+    T: PartialOrd,
+{
+    type Item = T;
+    fn has(&self, v: Self::Item) -> bool {
+        self.start <= v && v < self.end
+    }
+}
+
 #[derive(Debug)]
 pub struct Configuration {
     pub title: String,
@@ -11,6 +26,7 @@ pub struct Configuration {
     pub result_range: Range<i32>,
     pub single_range: Range<i32>,
     pub addition_range: Range<i32>,
+    pub multiplication_range: Range<i32>,
 }
 
 pub struct ValidatorForMySon<'a> {
@@ -27,25 +43,19 @@ impl<'a> Validator for ValidatorForMySon<'a> {
         match op {
             Op::Div => {
                 self.has_mul_or_div = true;
-                v1 < 100 && v2 < 10 && v2 > 1 && (v1 / v2 < 10) && (v1 % v2 == 0)
+                (2..10).has(v2) && (v1 / v2 < 10) && (v1 % v2 == 0)
             }
             Op::Mul => {
                 self.has_mul_or_div = true;
-                v1 < 20 && 4 < v1 && 4 < v2 && v2 < 20
+                //(5..21).has(v1) && (5..21).has(v2)
+                self.cfg.multiplication_range.has(v1) && self.cfg.multiplication_range.has(v2)
             }
             Op::Minus => {
-                v1 >= self.cfg.addition_range.start
-                    && v1 < self.cfg.addition_range.end
-                    && v2 >= self.cfg.addition_range.start
-                    && v2 < self.cfg.addition_range.end
-                    && v1 > v2
+                self.cfg.addition_range.has(v1) && self.cfg.addition_range.has(v2) && v1 > v2
             }
 
             _ => {
-                v1 >= self.cfg.addition_range.start
-                    && v1 < self.cfg.addition_range.end
-                    && v2 >= self.cfg.addition_range.start
-                    && v2 < self.cfg.addition_range.end
+                self.cfg.addition_range.has(v1) && self.cfg.addition_range.has(v2)
             }
         }
     }
@@ -60,6 +70,17 @@ impl<'a> Validator for ValidatorForMySon<'a> {
 }
 
 impl Configuration {
+    pub fn basic() -> Configuration {
+        Configuration {
+            title: "四则混合练习题".to_string(),
+            level: 2,
+            single_range: 0..100,
+            result_range: 0..300,
+            addition_range: 10..100,
+            multiplication_range: 5..21,
+        }
+    }
+
     /// generate random math expression
     /// 1 2 3 + * => 1 * (2+3)
     /// level: 1 => two oprands one op

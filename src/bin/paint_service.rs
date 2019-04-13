@@ -76,14 +76,10 @@ fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse
         .and_then(|fd: GenerateFormData| {
             info!("form: (title = {}, level = {}, range = {}, kind = {})",
             fd.title, fd.level, fd.range, fd.kind);
-
-            let mut cfg = Configuration {
-                title: fd.title,
-                level: fd.level,
-                single_range: 0..200,
-                result_range: 0..fd.range,
-                addition_range: 0..200,
-            };
+            let mut cfg = Configuration::basic();
+            cfg.result_range = 0..fd.range;
+            cfg.title = fd.title;
+            cfg.level = fd.level;
 
             let (body, ct) = match fd.kind.as_ref() {
                 "pdf" => (cfg.render_pdf_to_stream(), "application/pdf"),
@@ -98,13 +94,7 @@ fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse
 }
 
 fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut cfg = Configuration {
-        title: "四则混合练习题".to_string(),
-        level: 2,
-        single_range: 0..200,
-        result_range: 0..200,
-        addition_range: 0..200,
-    };
+    let mut cfg = Configuration::basic();
 
     let body = cfg.render_pdf_to_stream(); 
 
@@ -114,15 +104,9 @@ fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
 }
 
 fn generate_math_png(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut conf = Configuration {
-        title: "四则混合练习题".to_string(),
-        level: 2,
-        single_range: 0..200,
-        result_range: 0..200,
-        addition_range: 0..200,
-    };
+    let mut cfg = Configuration::basic();
 
-    let body = conf.render_png_to_stream(); 
+    let body = cfg.render_png_to_stream(); 
 
     info!("generate_math_png, read {}", body.len());
 

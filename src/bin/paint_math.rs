@@ -2,13 +2,8 @@ use mathgen::paint::*;
 use std::process::Command;
 
 fn main() {
-    let mut cfg = Configuration {
-        title: "四则混合练习题（曹宇轩）".to_string(),
-        level: 2,
-        single_range: 0..100,
-        result_range: 0..300,
-        addition_range: 10..100,
-    };
+    let mut cfg = Configuration::basic();
+    cfg.title = "四则混合练习题（曹宇轩）".to_string();
 
     (0..10).for_each(|i| { 
         let s = format!("math{}.pdf", i);
