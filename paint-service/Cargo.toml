@@ -1,0 +1,29 @@
+[package]
+name = "paint-service"
+version = "0.1.0"
+authors = ["Sian Cao <yinshuiboy@gmail.com>"]
+edition = "2018"
+
+[features]
+default = ["local"]
+
+local = []
+service = []
+
+[dependencies]
+mathgen = { path = "../mathgen" }
+rand = "0.6"
+actix-web = "0.7"
+env_logger = "0.5"
+dotenv = "0.13"
+log = "0.4"
+
+diesel = {version = "1.4", features = ["postgres", "sqlite"]}
+
+r2d2 = "0.8.2"
+r2d2-diesel = "1.0.0"
+
+serde = "*"
+serde_derive = "*"
+
+futures = "*"

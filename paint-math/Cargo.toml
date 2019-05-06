@@ -1,0 +1,13 @@
+[package]
+name = "paint-math"
+version = "0.1.0"
+authors = ["Sian Cao <yinshuiboy@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+mathgen = { path = "../mathgen" }
+rand = "0.6"
+env_logger = "0.5"
+dotenv = "0.13"
+log = "0.4"
+
