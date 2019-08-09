@@ -12,6 +12,7 @@ service = []
 
 [dependencies]
 mathgen = { path = "../mathgen" }
+paint-math = { path = "../paint-math" }
 rand = "0.6"
 actix-web = "0.7"
 env_logger = "0.5"

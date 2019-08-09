@@ -11,7 +11,7 @@ use dotenv::dotenv;
 
 use futures::future::{Future, ok};
 
-use mathgen::paint::*;
+use paint_math::paint::*;
 
 struct MathState {
     requests: Cell<i32>,
@@ -76,27 +76,26 @@ fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse
         .and_then(|fd: GenerateFormData| {
             info!("form: (title = {}, level = {}, range = {}, kind = {})",
             fd.title, fd.level, fd.range, fd.kind);
-            let mut cfg = Configuration::basic();
-            cfg.result_range = 0..fd.range;
-            cfg.title = fd.title;
-            cfg.level = fd.level;
+            let mut gen = PrimitiveMathGen::new();
+            gen.result_range = 0..fd.range;
+            gen.level = fd.level;
+
+            let mut painter = MathPainter::new(gen);
+            painter.title = fd.title;
 
             let (body, ct) = match fd.kind.as_ref() {
-                "pdf" => (cfg.render_pdf_to_stream(), "application/pdf"),
-                _ => (cfg.render_png_to_stream(), "image/png")
+                "pdf" => (painter.render_pdf_to_stream(), "application/pdf"),
+                _ => (painter.render_png_to_stream(), "image/png")
             };
 
             ok(HttpResponse::Ok().content_type(ct).body(body))
-
-
         })
         .responder()
 }
 
 fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut cfg = Configuration::basic();
-
-    let body = cfg.render_pdf_to_stream(); 
+    let mut painter = MathPainter::new(PrimitiveMathGen::new());
+    let body = painter.render_pdf_to_stream(); 
 
     HttpResponse::Ok()
         .content_type("application/pdf")
@@ -104,9 +103,8 @@ fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
 }
 
 fn generate_math_png(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut cfg = Configuration::basic();
-
-    let body = cfg.render_png_to_stream(); 
+    let mut painter = MathPainter::new(PrimitiveMathGen::new());
+    let body = painter.render_png_to_stream(); 
 
     info!("generate_math_png, read {}", body.len());
 

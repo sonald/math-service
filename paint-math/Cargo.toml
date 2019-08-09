@@ -4,10 +4,13 @@ version = "0.1.0"
 authors = ["Sian Cao <yinshuiboy@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "paint_math"
+path = "src/lib.rs"
+
 [dependencies]
 mathgen = { path = "../mathgen" }
+cairo-rs = {version = "0.6", features = ["png", "pdf"]}
 rand = "0.6"
-env_logger = "0.5"
-dotenv = "0.13"
 log = "0.4"
-
+dotenv = "*"

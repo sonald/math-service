@@ -5,3 +5,6 @@ authors = ["Sian Cao <yinshuiboy@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+futures = "0.1"
+tokio = "*"
+rdkafka = "0.21"

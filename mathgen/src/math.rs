@@ -1,5 +1,5 @@
-use rand::prelude::*;
 use std::fmt::*;
+use std::ops::Range;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
@@ -64,7 +64,7 @@ impl Display for Expr {
                     match v2.as_ref() {
                         Single(_) => write!(f, "{}", v2),
                         Primitive(op2, _, _) | Compound(op2, _, _) => {
-                            if *op2 == Op::Add || *op2 == Op::Minus || *op == Op::Div {
+                            if *op2 == Op::Add || *op2 == Op::Minus || *op2 == Op::Div {
                                 write!(f, "({})", v2)
                             } else {
                                 write!(f, "{}", v2)
@@ -79,36 +79,7 @@ impl Display for Expr {
 
 use self::Expr::*;
 
-fn rand_op() -> Op {
-    let mut rng = thread_rng();
-    match rng.gen_range(0, 4) {
-        0 => Op::Add,
-        1 => Op::Minus,
-        2 => Op::Mul,
-        3 => Op::Div,
-        _ => unreachable!(),
-    }
-}
-
 impl Expr {
-    pub fn gen(noprand: i32, nop: i32) -> Expr {
-        let mut rng = thread_rng();
-
-        match (noprand, nop) {
-            (1, 0) => Single(rng.gen_range(1, 200)),
-            (2, 1) => Primitive(rand_op(), rng.gen_range(1, 200), rng.gen_range(1, 200)),
-            _ => {
-                let lnoprand = rng.gen_range(1, noprand);
-                let rnoprand = noprand - lnoprand;
-
-                let lhs = Expr::gen(lnoprand, lnoprand - 1);
-                let rhs = Expr::gen(rnoprand, rnoprand - 1);
-
-                Compound(rand_op(), Box::new(lhs), Box::new(rhs))
-            }
-        }
-    }
-
     pub fn eval(&self) -> i32 {
         match self {
             Single(v) => *v,
@@ -150,3 +121,9 @@ pub trait Validator {
     fn pass(&self) -> bool;
     fn init(&mut self);
 }
+
+pub trait MathGenerator {
+    fn generate_rand_math(&mut self) -> Expr;
+    fn gen(&mut self, noprand: i32, nop: i32) -> Expr;
+}
+
