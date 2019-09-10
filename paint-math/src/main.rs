@@ -12,7 +12,7 @@ fn main() {
         gen.result_range = 10..999;
         gen.addition_range = 10..100;
         gen.multiplication_range = 2..20;
-        gen.level = 3;
+        gen.level = 2;
 
         let mut painter = MathPainter::new(gen);
         painter.title = format!("1000以内4则混合练习题（{}）", std::env::var("PM_NAME").unwrap());

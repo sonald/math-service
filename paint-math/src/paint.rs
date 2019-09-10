@@ -35,6 +35,8 @@ impl MathGenerator for PrimitiveMathGen {
         let level = self.level;
         let (noprand, nop) = (level + 1, level);
         loop {
+            self.has_div = false;
+            self.has_mul = false;
             let e = self.gen(noprand, nop);
             //eprintln!("{:?} => {}", e, e);
             if self.result_range.contains(&e.eval()) && 
@@ -88,9 +90,11 @@ impl MathGenerator for PrimitiveMathGen {
                     let (l, r) = (lhs.eval(), rhs.eval());
                     if ! match op {
                         Op::Div => {
+                            self.has_div = true;
                             (2..10).contains(&r) && (l / r < 10) && (l % r == 0)
                         },
                         Op::Mul => {
+                            self.has_mul = true;
                             self.multiplication_range.contains(&l) && self.multiplication_range.contains(&r)
                         },
                         Op::Minus => {
@@ -98,6 +102,8 @@ impl MathGenerator for PrimitiveMathGen {
                         },
                         _ =>  true
                     } {
+                        self.has_div = false;
+                        self.has_mul = false;
                         continue;
                     }
 
@@ -148,7 +154,7 @@ impl<G> MathPainter<G> where G: MathGenerator {
 
     pub fn generate_math(&mut self, cr: &Context) {
         let msg = format!(
-            "{:15}={}",
+            "{:10}={}",
             self.g.generate_rand_math().to_string(),
             " ".repeat(5)
         );
@@ -213,7 +219,7 @@ impl<G> MathPainter<G> where G: MathGenerator {
             for _ in 0..4 {
                 y += 35;
                 cr.move_to(20.0, y as f64);
-                (0..3).for_each(|_| self.generate_math(&cr));
+                (0..4).for_each(|_| self.generate_math(&cr));
             }
         }
     }
