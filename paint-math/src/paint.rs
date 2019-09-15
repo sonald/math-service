@@ -4,8 +4,9 @@ use mathgen::math::Expr::*;
 use cairo::*;
 use log::*;
 use std::fs::File;
-use std::ops::Range;
+use std::ops::{Range, Bound, RangeBounds};
 use rand::prelude::*;
+use std::fmt::Debug;
 
 pub struct PrimitiveMathGen {
     pub level: i32,
@@ -17,12 +18,49 @@ pub struct PrimitiveMathGen {
     rng: ThreadRng,
     has_mul: bool,
     has_div: bool,
+}
 
+pub struct GenerativeMathGen {
+    pub level: i32,
+    pub result_range: Range<i32>,
+    pub single_range: Range<i32>,
+    pub add_range: Range<i32>,
+    pub mul_range: Range<i32>,
+    pub minus_range: Range<i32>,
+    pub div_range: Range<i32>,
+
+    rng: ThreadRng,
+    has_mul: bool,
+    has_div: bool,
 }
 
 pub struct MathPainter<G: MathGenerator> {
     g:  G,
     pub title: String,
+}
+
+fn range_union(r1: impl RangeBounds<i32> + Debug, r2: impl RangeBounds<i32> + Debug) -> Option<Range<i32>> {
+    use Bound::*;
+    let start = match (r1.start_bound(), r2.start_bound()) {
+        (Included(&v1), Included(&v2)) => v1.max(v2),
+        _ => unreachable!()
+    };
+
+    let end = match (r1.end_bound(), r2.end_bound()) {
+        (Included(&v1), Included(&v2)) => v1.min(v2)+1,
+        (Excluded(&v1), Included(&v2)) => v1.min(v2+1),
+        (Included(&v1), Excluded(&v2)) => (v1+1).min(v2),
+        (Excluded(&v1), Excluded(&v2)) => v1.min(v2),
+        _ => unreachable!()
+    };
+
+    //eprintln!("range_union: {:?} U {:?} => {:?}", r1, r2, start..end);
+
+    if start >= end {
+        None
+    } else {
+        Some(start..end)
+    }
 }
 
 impl MathGenerator for PrimitiveMathGen {
@@ -125,6 +163,214 @@ impl PrimitiveMathGen {
             rng: thread_rng(),
             has_mul: false,
             has_div: false
+        }
+    }
+
+    pub fn rand(&mut self, r: Range<i32>) -> i32 {
+        self.rng.gen_range(r.start, r.end)
+    }
+
+
+    pub fn rand_op(&mut self) -> Op {
+        match self.rng.gen_range(0, 4) {
+            3 => Op::Add,
+            1 => Op::Minus,
+            2 => Op::Mul,
+            0 => Op::Div,
+            _ => unreachable!(),
+        }
+    }
+}
+
+
+impl MathGenerator for GenerativeMathGen {
+    fn generate_rand_math(&mut self) -> Expr {
+        let level = self.level;
+        self.gen(level+1, level)
+    }
+
+    fn gen(&mut self, noprand: i32, nop: i32) -> Expr {
+        loop {
+            if let Some(e) = self.gen_iter(noprand, nop, self.result_range.clone()) {
+                return e
+            }
+        }
+    }
+}
+
+macro_rules! try_option {
+    ($e:expr) => (
+        match $e {
+            Some(v) => v,
+            _ => return None
+        }
+    )
+}
+impl GenerativeMathGen {
+    pub fn new() -> Self {
+        GenerativeMathGen {
+            level: 3,
+            single_range: 10..150,
+            result_range: 1..400,
+            add_range: 20..400,
+            minus_range: 20..100,
+            mul_range: 11..200,
+            div_range: 5..11,
+            rng: thread_rng(),
+            has_mul: false,
+            has_div: false
+        }
+    }
+
+    pub fn gen_iter<T: RangeBounds<i32> + Clone + Debug>(&mut self, noprand: i32, nop: i32, bound: T) -> Option<Expr> {
+        match (noprand, nop) {
+            (1, 0) => {
+                range_union(self.single_range.clone(), bound.clone())
+                    .map(|range| Single(self.rand(range)))
+            }
+            (2, 1) => {
+                let (mut l, mut r) = (0, 0);
+                let op = self.rand_op();
+                match op {
+                    Op::Div => {
+                        let range = try_option!(range_union(bound.clone(), 2..10));
+                        r = self.rand(range);
+                        range_union(bound.clone(), self.div_range.clone())
+                            .map(|range| {
+                                let res = self.rand(range);
+                                assert!(res != 0);
+                                l = r * res; 
+                            });
+                    },
+                    Op::Mul => {
+                        let range = try_option!(range_union(bound.clone(), 5..20));
+                        r = self.rand(range);
+                        range_union(bound.clone(), self.mul_range.clone())
+                            .map(|range| {
+                                let res = self.rand(range);
+                                l =  res / r;
+                            });
+                    },
+                    Op::Minus => {
+                        range_union(bound.clone(), self.single_range.clone())
+                            .map(|range| {
+                                r = self.rand(range);
+                                if let Some(res) = range_union(bound.clone(), self.minus_range.clone()) {
+                                    l = self.rand((res.start+r)..(res.end+r));
+                                }
+                            });
+                    },
+                    _ => {
+                        range_union(bound.clone(), self.single_range.clone())
+                            .and_then(|range| {
+                                l = self.rand(range);
+                                range_union(bound.clone(), self.single_range.clone())
+                                    .map(|range2| {
+                                        r = self.rand(range2);
+                                    })
+                            });
+                    }
+                }
+                Some(Primitive(op, l, r))
+            }
+            _ => {
+                let lnoprand = self.rand(1..noprand);
+                let rnoprand = noprand - lnoprand;
+
+                let (mut lhs, mut rhs);
+                let (mut l, mut r) = (0, 0);
+                let op = self.rand_op();
+                match op {
+                    Op::Div => {
+                        let mut retries = 10;
+                        loop {
+                            let range = try_option!(range_union(bound.clone(), 2..10));
+                            rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                                Some(v) => v,
+                                None => return None,
+                            };
+
+                            r = rhs.eval();
+                            if r > 0 {
+                                break
+                            }
+
+                            retries -= 1;
+                            if retries <= 0 {
+                                return None
+                            }
+                        }
+                        let range = (self.div_range.start*r)..(self.div_range.end*r);
+                        let range = try_option!(range_union(bound.clone(), range));
+                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                            Some(v) => v,
+                            None => return None,
+                        };
+                    },
+                    Op::Mul => {
+                        let mut retries = 10;
+                        loop {
+                            let range = try_option!(range_union(bound.clone(), 5..20));
+                            lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                                Some(v) => v,
+                                None => return None,
+                            };
+
+                            l = lhs.eval();
+                            if l == 0 {
+                                continue;
+                            }
+                            let range = (self.mul_range.start/l)..(self.mul_range.end/l);
+                            rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                                Some(v) => v,
+                                None => return None,
+                            };
+                            r = rhs.eval();
+
+                            let range = try_option!(range_union(bound.clone(), self.mul_range.clone()));
+                            if range.contains(&(l * r)) {
+                                break
+                            }
+
+                            retries -= 1;
+                            if retries <= 0 {
+                                return None
+                            }
+                        }
+                    },
+                    Op::Minus => {
+                        let range = try_option!(range_union(bound.clone(), self.single_range.clone()));
+                        rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                            Some(v) => v,
+                            None => return None,
+                        };
+
+                        r = rhs.eval();
+                        let range = (self.minus_range.start+r)..(self.minus_range.end+r);
+                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                            Some(v) => v,
+                            None => return None,
+                        };
+                    },
+                    _ => {
+                        let range = try_option!(range_union(bound.clone(), self.single_range.clone()));
+                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                            Some(v) => v,
+                            None => return None,
+                        };
+
+                        l = lhs.eval();
+                        let range = (self.add_range.start-l)..(self.add_range.end-l);
+                        rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                            Some(v) => v,
+                            None => return None,
+                        };
+                    }
+                }
+
+                Some(Compound(op, Box::new(lhs), Box::new(rhs)))
+
+            }
         }
     }
 
@@ -265,4 +511,58 @@ impl<G> MathPainter<G> where G: MathGenerator {
         target.write_to_png(&mut buf).ok();
         buf
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn range_test() {
+        let r = 4..15;
+        let r2 = 6..23;
+        let res = range_union(r, r2).unwrap();
+        assert_eq!(res.start_bound(), Bound::Included(&6));
+        assert_eq!(res.end_bound(), Bound::Excluded(&15));
+
+        let r = 4..=15;
+        let r2 = 6..15;
+        let res = range_union(r, r2).unwrap();
+        assert_eq!(res.start_bound(), Bound::Included(&6));
+        assert_eq!(res.end_bound(), Bound::Excluded(&15));
+
+        let r = 4..15;
+        let r2 = 2..9;
+        let res = range_union(r, r2).unwrap();
+        assert_eq!(res.start_bound(), Bound::Included(&4));
+        assert_eq!(res.end_bound(), Bound::Excluded(&9));
+
+        let r = 4..5;
+        let r2 = 2..9;
+        let res = range_union(r, r2).unwrap();
+        assert_eq!(res.start_bound(), Bound::Included(&4));
+        assert_eq!(res.end_bound(), Bound::Excluded(&5));
+
+        let mut g = GenerativeMathGen::new();
+        eprintln!("{}", g.gen(3, 2));
+        eprintln!("{}", g.gen(3, 2));
+        eprintln!("{}", g.gen(3, 2));
+
+        let now = std::time::Instant::now();
+        let mut g = GenerativeMathGen::new();
+        (0..1000).for_each(|_| {
+            eprintln!("{}", g.gen(3, 2));
+            g.gen(3, 2); 
+        });
+        eprintln!("duration: {}", now.elapsed().as_millis());
+
+        let now = std::time::Instant::now();
+        let mut g = GenerativeMathGen::new();
+        (0..1000).for_each(|_| {
+            //eprintln!("{}", g.gen(4, 3));
+            g.gen(4, 3); 
+        });
+        eprintln!("duration: {}", now.elapsed().as_millis());
+    }
+
 }
