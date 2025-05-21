@@ -1,136 +1,137 @@
-use actix_web::{server, Result, Error, Responder, http, HttpRequest, HttpResponse, App, fs::NamedFile};
-use actix_web::{HttpMessage, AsyncResponder};
-use actix_web::error::ErrorNotFound;
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Error, Responder};
+use actix_files::NamedFile;
+use std::path::PathBuf;
 
-use log::*;
-use std::cell::Cell;
-use dotenv::dotenv;
+#[macro_use] extern crate diesel;
+#[macro_use] extern crate log;
 
-//use serde::Deserialize;
-#[macro_use] extern crate serde_derive;
+extern crate dotenv;
+extern crate rand;
+extern crate r2d2;
+// extern crate r2d2_diesel; // Removed as using diesel's built-in r2d2 feature
+extern crate paint_math;
+extern crate mathgen;
 
-use futures::future::{Future, ok};
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
+use diesel::r2d2::ConnectionManager as DieselConnectionManager; // Using diesel's r2d2 ConnectionManager
 
-use paint_math::paint::*;
+use paint_math::paint::PrimitiveMathGen;
+use paint_math::paint::MathPainter; // Added import for MathPainter
+use serde::Deserialize;
 
-struct MathState {
-    requests: Cell<i32>,
-}
+mod schema;
+mod models;
 
 #[derive(Deserialize)]
-struct GenerateFormData {
+struct GenerateParams {
     title: String,
     level: i32,
-    range: i32,
-    kind: String
+}
+
+pub struct MathState {
+    pool: r2d2::Pool<DieselConnectionManager<PgConnection>>, // Updated ConnectionManager
 }
 
 impl MathState {
-    fn new() -> MathState {
-        info!("create new state");
-
+    pub fn new(pool: r2d2::Pool<DieselConnectionManager<PgConnection>>) -> Self { // Updated ConnectionManager
         MathState {
-            requests: Cell::new(0)
+            pool: pool,
         }
     }
+}
 
-    fn incr(&self) {
-        debug!("incr: {}", self.requests.get());
-        self.requests.set(self.requests.get() + 1);
+async fn index(_req: HttpRequest) -> Result<NamedFile, Error> {
+    let path = PathBuf::from("static/index.html");
+    Ok(NamedFile::open(path)?)
+}
+
+async fn index2(req: HttpRequest) -> impl Responder { 
+    info!("index2: {:?}", req);
+    HttpResponse::Ok().body("hello from index2")
+}
+
+async fn handle_generate(
+    data: web::Data<MathState>, 
+    params: web::Query<GenerateParams>
+) -> Result<HttpResponse, Error> {
+    let title = params.title.clone();
+    let level = params.level;
+    let pool = data.pool.clone();
+
+    let result: Result<Vec<u8>, _> = web::block(move || {
+        let _db_conn = pool.get().map_err(|e| {
+            error!("Failed to get DB connection from pool: {}",e);
+            // () // Error type for web::block needs to be consistent
+        })?; // Added ? to propagate error, ensure error type matches block's requirements
+
+        let mut gen = PrimitiveMathGen::new();
+        gen.level = level;
+        let mut painter = MathPainter::new(gen); 
+        painter.title = title;
+        let pdf_data = painter.render_pdf_to_stream();
+        Ok(pdf_data) as Result<Vec<u8>, ()> // Error type for web::block needs to be simple or map to one
+    }).await.map_err(|e| {
+        error!("Blocking error: {}", e);
+        actix_web::error::ErrorInternalServerError("Blocking error") // Ensure this error type matches function signature
+    })?;
+
+    match result {
+        Ok(pdf_data) => {
+            Ok(HttpResponse::Ok()
+                .content_type("application/pdf")
+                .body(pdf_data))
+        }
+        Err(_) => {
+             Ok(HttpResponse::InternalServerError().finish())
+        }
     }
 }
 
-fn index(_: &HttpRequest<MathState>) -> Result<NamedFile> {
-    info!("get index");
-
-    if cfg!(feature = "service") {
-        Ok(NamedFile::open("/web/api.sonald.me/index.html")?)
-    } else if cfg!(feature = "local") {
-        Ok(NamedFile::open("./index.html")?)
-    } else {
-        Err(ErrorNotFound("format is not supported"))
-    }
-}
-
-fn index2(req: &HttpRequest<MathState>) -> impl Responder {
-    info!("get index");
-
-    req.state().incr();
-
-    let body = format!("<h1> Math Garden </h1>
-    <div>
-        requests : {}
-    </div> ", req.state().requests.get());
-
-    let mut resp = HttpResponse::with_body(http::StatusCode::OK, body);
-    resp.headers_mut().insert(http::header::CONTENT_TYPE, "text/html".parse().unwrap());
-
-    resp
-}
-
-fn handle_generate(req: &HttpRequest<MathState>) -> Box<Future<Item=HttpResponse, Error=Error>> {
-    info!("handle_generate");
-
-    req.urlencoded::<GenerateFormData>()
-        .from_err()
-        .and_then(|fd: GenerateFormData| {
-            info!("form: (title = {}, level = {}, range = {}, kind = {})",
-            fd.title, fd.level, fd.range, fd.kind);
-            let mut gen = PrimitiveMathGen::new();
-            gen.result_range = 0..fd.range;
-            gen.level = fd.level;
-
-            let mut painter = MathPainter::new(gen);
-            painter.title = fd.title;
-
-            let (body, ct) = match fd.kind.as_ref() {
-                "pdf" => (painter.render_pdf_to_stream(), "application/pdf"),
-                _ => (painter.render_png_to_stream(), "image/png")
-            };
-
-            ok(HttpResponse::Ok().content_type(ct).body(body))
-        })
-        .responder()
-}
-
-fn generate_math(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut painter = MathPainter::new(PrimitiveMathGen::new());
-    let body = painter.render_pdf_to_stream(); 
-
+async fn generate_math(data: web::Data<MathState>) -> impl Responder { 
+    let _pool = data.pool.clone(); 
+    let mut gen = PrimitiveMathGen::new();
+    let mut painter = MathPainter::new(gen); 
+    let pdf_data = painter.render_pdf_to_stream();
     HttpResponse::Ok()
         .content_type("application/pdf")
-        .body(body)
+        .body(pdf_data)
 }
 
-fn generate_math_png(_: &HttpRequest<MathState>) -> impl Responder {
-    let mut painter = MathPainter::new(PrimitiveMathGen::new());
-    let body = painter.render_png_to_stream(); 
-
-    info!("generate_math_png, read {}", body.len());
-
+async fn generate_math_png(data: web::Data<MathState>) -> impl Responder { 
+    let _pool = data.pool.clone(); 
+    let mut gen = PrimitiveMathGen::new();
+    let mut painter = MathPainter::new(gen); 
+    let png_data = painter.render_png_to_stream();
     HttpResponse::Ok()
         .content_type("image/png")
-        .body(body)
+        .body(png_data)
 }
 
-fn main() {
-    dotenv().ok();
-
+#[actix_web::main] 
+async fn main() -> std::io::Result<()> {
+    dotenv::dotenv().ok();
+    std::env::set_var("RUST_LOG", "actix_web=info,paint_service=info");
     env_logger::init();
 
-    let serv = server::new(|| App::with_state(MathState::new())
-                .prefix("/apps/math")
-                .resource("/", |r| {
-                    r.method(http::Method::POST).f(handle_generate);
-                    r.method(http::Method::GET).f(index)
-                })
-                .resource("/pdf", |r| r.method(http::Method::GET).f(generate_math))
-                .resource("/png", |r| r.method(http::Method::GET).f(generate_math_png)));
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let manager = DieselConnectionManager::<PgConnection>::new(database_url); // Updated ConnectionManager
+    let pool = r2d2::Pool::builder()
+        .build(manager)
+        .expect("Failed to create pool.");
 
-    if cfg!(feature = "service") {
-        serv.bind("127.0.0.1:8080").unwrap().run();
-    } else if cfg!(feature = "local") {
-        serv.bind("0.0.0.0:8080").unwrap().run();
-    }
-
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(MathState::new(pool.clone()))) 
+            .wrap(actix_web::middleware::Logger::default())
+            .service(web::resource("/generate_math_params").route(web::get().to(handle_generate)))
+            .service(web::resource("/generate_math").route(web::get().to(generate_math)))
+            .service(web::resource("/generate_math_png").route(web::get().to(generate_math_png)))
+            .service(web::resource("/index2.html").route(web::get().to(index2)))
+            .service(web::resource("/").route(web::get().to(index))) 
+            .service(actix_files::Files::new("/", "static").show_files_listing()) 
+    })
+    .bind("127.0.0.1:8088")?
+    .run()
+    .await
 }

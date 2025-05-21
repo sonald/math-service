@@ -16,8 +16,8 @@ pub struct PrimitiveMathGen {
     pub multiplication_range: Range<i32>,
 
     rng: ThreadRng,
-    has_mul: bool,
-    has_div: bool,
+    // has_mul: bool, // Removed
+    // has_div: bool, // Removed
 }
 
 pub struct GenerativeMathGen {
@@ -30,8 +30,8 @@ pub struct GenerativeMathGen {
     pub div_range: Range<i32>,
 
     rng: ThreadRng,
-    has_mul: bool,
-    has_div: bool,
+    // has_mul: bool, // Removed
+    // has_div: bool, // Removed
 }
 
 pub struct MathPainter<G: MathGenerator> {
@@ -73,86 +73,97 @@ impl MathGenerator for PrimitiveMathGen {
         let level = self.level;
         let (noprand, nop) = (level + 1, level);
         loop {
-            self.has_div = false;
-            self.has_mul = false;
-            let e = self.gen(noprand, nop);
+            let mut current_has_div = false;
+            let mut current_has_mul = false;
+            let e = self.gen_expr_with_state(noprand, nop, &mut current_has_div, &mut current_has_mul);
             //eprintln!("{:?} => {}", e, e);
             if self.result_range.contains(&e.eval()) && 
-                (self.has_div || self.has_mul) {
+                (current_has_div || current_has_mul) { // Check the local state
                 return e
             }
         }
     }
 
+    // Renamed original gen to gen_expr_with_state to pass down div/mul state
     fn gen(&mut self, noprand: i32, nop: i32) -> Expr {
+        let mut current_has_div = false; // Dummy state, not used by top-level call
+        let mut current_has_mul = false; // Dummy state, not used by top-level call
+        self.gen_expr_with_state(noprand, nop, &mut current_has_div, &mut current_has_mul)
+    }
+}
+
+impl PrimitiveMathGen {
+    // Helper function to pass down the div/mul state
+    fn gen_expr_with_state(&mut self, noprand: i32, nop: i32, current_has_div: &mut bool, current_has_mul: &mut bool) -> Expr {
         match (noprand, nop) {
             (1, 0) => Single(self.rand(self.single_range.clone())),
             (2, 1) => {
                 loop {
                     let op = self.rand_op();
-                    let (l, r) = (self.rand(self.single_range.clone()),
+                    let (l, r_val) = (self.rand(self.single_range.clone()),
                     self.rand(self.single_range.clone()));
 
-                    let e = Primitive(op, l, r);
+                    let e = Primitive(op, l, r_val);
+                    let mut op_has_div = false;
+                    let mut op_has_mul = false;
                     if ! match op {
                         Op::Div => {
-                            self.has_div = true;
-                            (2..10).contains(&r) && (l / r < 10) && (l % r == 0)
+                            op_has_div = true;
+                            (2..10).contains(&r_val) && (l / r_val < 10) && (l % r_val == 0)
                         },
                         Op::Mul => {
-                            self.has_mul = true;
-                            self.multiplication_range.contains(&l) && self.multiplication_range.contains(&r)
+                            op_has_mul = true;
+                            self.multiplication_range.contains(&l) && self.multiplication_range.contains(&r_val)
                         },
                         Op::Minus => {
-                            self.addition_range.contains(&l) && self.addition_range.contains(&r) && l > r
+                            self.addition_range.contains(&l) && self.addition_range.contains(&r_val) && l > r_val
                         },
                         _ =>  true
                     } {
-                        self.has_div = false;
-                        self.has_mul = false;
                         continue;
                     }
+                    *current_has_div |= op_has_div;
+                    *current_has_mul |= op_has_mul;
 
                     return e
                 }
             }
             _ => {
-                let lnoprand = self.rand(1..noprand);
+                let lnoprand = self.rand(1..noprand); // This uses Range<i32> which is fine for rand()
                 let rnoprand = noprand - lnoprand;
 
                 loop {
-                    let lhs = self.gen(lnoprand, lnoprand - 1);
-                    let rhs = self.gen(rnoprand, rnoprand - 1);
+                    let lhs = self.gen_expr_with_state(lnoprand, lnoprand - 1, current_has_div, current_has_mul);
+                    let rhs = self.gen_expr_with_state(rnoprand, rnoprand - 1, current_has_div, current_has_mul);
 
                     let op = self.rand_op();
-                    let (l, r) = (lhs.eval(), rhs.eval());
+                    let (l_eval, r_eval) = (lhs.eval(), rhs.eval());
+                    let mut op_has_div = false;
+                    let mut op_has_mul = false;
                     if ! match op {
                         Op::Div => {
-                            self.has_div = true;
-                            (2..10).contains(&r) && (l / r < 10) && (l % r == 0)
+                            op_has_div = true;
+                            (2..10).contains(&r_eval) && (l_eval / r_eval < 10) && (l_eval % r_eval == 0)
                         },
                         Op::Mul => {
-                            self.has_mul = true;
-                            self.multiplication_range.contains(&l) && self.multiplication_range.contains(&r)
+                            op_has_mul = true;
+                            self.multiplication_range.contains(&l_eval) && self.multiplication_range.contains(&r_eval)
                         },
                         Op::Minus => {
-                            self.addition_range.contains(&l) && self.addition_range.contains(&r) && l > r
+                            self.addition_range.contains(&l_eval) && self.addition_range.contains(&r_eval) && l_eval > r_eval
                         },
                         _ =>  true
                     } {
-                        self.has_div = false;
-                        self.has_mul = false;
                         continue;
                     }
-
+                    *current_has_div |= op_has_div;
+                    *current_has_mul |= op_has_mul;
                     return Compound(op, Box::new(lhs), Box::new(rhs));                
                 }
             }
         }
     }
-}
 
-impl PrimitiveMathGen {
     pub fn new() -> Self {
         PrimitiveMathGen {
             level: 3,
@@ -161,18 +172,18 @@ impl PrimitiveMathGen {
             addition_range: 20..100,
             multiplication_range: 5..21,
             rng: thread_rng(),
-            has_mul: false,
-            has_div: false
+            // has_mul: false, // Removed
+            // has_div: false  // Removed
         }
     }
 
     pub fn rand(&mut self, r: Range<i32>) -> i32 {
-        self.rng.gen_range(r.start, r.end)
+        self.rng.gen_range(r.start, r.end) 
     }
 
 
     pub fn rand_op(&mut self) -> Op {
-        match self.rng.gen_range(0, 4) {
+        match self.rng.gen_range(0, 4) { 
             3 => Op::Add,
             1 => Op::Minus,
             2 => Op::Mul,
@@ -190,6 +201,8 @@ impl MathGenerator for GenerativeMathGen {
     }
 
     fn gen(&mut self, noprand: i32, nop: i32) -> Expr {
+        // The has_mul and has_div fields were removed, so no need to update them here.
+        // The logic relies on gen_iter which doesn't use those fields.
         loop {
             if let Some(e) = self.gen_iter(noprand, nop, self.result_range.clone()) {
                 return e
@@ -217,8 +230,8 @@ impl GenerativeMathGen {
             mul_range: 11..200,
             div_range: 5..11,
             rng: thread_rng(),
-            has_mul: false,
-            has_div: false
+            // has_mul: false, // Removed
+            // has_div: false  // Removed
         }
     }
 
@@ -229,69 +242,70 @@ impl GenerativeMathGen {
                     .map(|range| Single(self.rand(range)))
             }
             (2, 1) => {
-                let (mut l, mut r) = (0, 0);
+                let (mut l, mut r_val) = (0, 0); // Renamed r to r_val to avoid conflict
                 let op = self.rand_op();
                 match op {
                     Op::Div => {
                         let range = try_option!(range_union(bound.clone(), 2..10));
-                        r = self.rand(range);
+                        r_val = self.rand(range);
                         range_union(bound.clone(), self.div_range.clone())
-                            .map(|range| {
-                                let res = self.rand(range);
+                            .map(|range_inner| { // Renamed range to range_inner
+                                let res = self.rand(range_inner);
                                 assert!(res != 0);
-                                l = r * res; 
+                                l = r_val * res; 
                             });
                     },
                     Op::Mul => {
                         let range = try_option!(range_union(bound.clone(), 5..20));
-                        r = self.rand(range);
+                        r_val = self.rand(range);
                         range_union(bound.clone(), self.mul_range.clone())
-                            .map(|range| {
-                                let res = self.rand(range);
-                                l =  res / r;
+                            .map(|range_inner| { // Renamed range to range_inner
+                                let res = self.rand(range_inner);
+                                if r_val != 0 { l = res / r_val; } else { l = 0; } // Avoid division by zero
                             });
                     },
                     Op::Minus => {
                         range_union(bound.clone(), self.single_range.clone())
-                            .map(|range| {
-                                r = self.rand(range);
-                                if let Some(res) = range_union(bound.clone(), self.minus_range.clone()) {
-                                    l = self.rand((res.start+r)..(res.end+r));
+                            .map(|range_inner| { // Renamed range to range_inner
+                                r_val = self.rand(range_inner);
+                                if let Some(res_range) = range_union(bound.clone(), self.minus_range.clone()) { // Renamed res to res_range
+                                    l = self.rand((res_range.start+r_val)..(res_range.end+r_val)); // This uses Range<i32>
                                 }
                             });
                     },
-                    _ => {
+                    _ => { // Add and default case
                         range_union(bound.clone(), self.single_range.clone())
-                            .and_then(|range| {
-                                l = self.rand(range);
+                            .and_then(|range_inner| { // Renamed range to range_inner
+                                l = self.rand(range_inner);
                                 range_union(bound.clone(), self.single_range.clone())
                                     .map(|range2| {
-                                        r = self.rand(range2);
+                                        r_val = self.rand(range2);
                                     })
                             });
                     }
                 }
-                Some(Primitive(op, l, r))
+                Some(Primitive(op, l, r_val))
             }
             _ => {
-                let lnoprand = self.rand(1..noprand);
+                let lnoprand = self.rand(1..noprand); // This uses Range<i32>
                 let rnoprand = noprand - lnoprand;
 
-                let (mut lhs, mut rhs);
-                let (mut l, mut r) = (0, 0);
+                let mut lhs: Expr; // Declare lhs as mutable
+                let mut rhs: Expr; // Declare rhs as mutable
+                let (mut l_eval, mut r_eval) = (0, 0); // Renamed l,r to l_eval, r_eval
                 let op = self.rand_op();
                 match op {
                     Op::Div => {
                         let mut retries = 10;
                         loop {
-                            let range = try_option!(range_union(bound.clone(), 2..10));
-                            rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                            let range_rhs = try_option!(range_union(bound.clone(), 2..10)); // Renamed range to range_rhs
+                            rhs = match self.gen_iter(rnoprand, rnoprand-1, range_rhs) {
                                 Some(v) => v,
                                 None => return None,
                             };
 
-                            r = rhs.eval();
-                            if r > 0 {
+                            r_eval = rhs.eval();
+                            if r_eval > 0 {
                                 break
                             }
 
@@ -300,9 +314,9 @@ impl GenerativeMathGen {
                                 return None
                             }
                         }
-                        let range = (self.div_range.start*r)..(self.div_range.end*r);
-                        let range = try_option!(range_union(bound.clone(), range));
-                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                        let range_lhs = (self.div_range.start*r_eval)..(self.div_range.end*r_eval); // Renamed range to range_lhs
+                        let range_lhs_final = try_option!(range_union(bound.clone(), range_lhs)); // Renamed range to range_lhs_final
+                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range_lhs_final) {
                             Some(v) => v,
                             None => return None,
                         };
@@ -310,25 +324,27 @@ impl GenerativeMathGen {
                     Op::Mul => {
                         let mut retries = 10;
                         loop {
-                            let range = try_option!(range_union(bound.clone(), 5..20));
-                            lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                            let range_lhs = try_option!(range_union(bound.clone(), 5..20)); // Renamed range to range_lhs
+                            lhs = match self.gen_iter(lnoprand, lnoprand-1, range_lhs) {
                                 Some(v) => v,
                                 None => return None,
                             };
 
-                            l = lhs.eval();
-                            if l == 0 {
+                            l_eval = lhs.eval();
+                            if l_eval == 0 { // check if l_eval is zero before division
+                                retries -=1;
+                                if retries <=0 { return None;}
                                 continue;
                             }
-                            let range = (self.mul_range.start/l)..(self.mul_range.end/l);
-                            rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                            let range_rhs = (self.mul_range.start/l_eval)..(self.mul_range.end/l_eval); // Renamed range to range_rhs
+                            rhs = match self.gen_iter(rnoprand, rnoprand-1, range_rhs) {
                                 Some(v) => v,
                                 None => return None,
                             };
-                            r = rhs.eval();
+                            r_eval = rhs.eval();
 
-                            let range = try_option!(range_union(bound.clone(), self.mul_range.clone()));
-                            if range.contains(&(l * r)) {
+                            let range_check = try_option!(range_union(bound.clone(), self.mul_range.clone())); // Renamed range to range_check
+                            if range_check.contains(&(l_eval * r_eval)) {
                                 break
                             }
 
@@ -339,29 +355,29 @@ impl GenerativeMathGen {
                         }
                     },
                     Op::Minus => {
-                        let range = try_option!(range_union(bound.clone(), self.single_range.clone()));
-                        rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                        let range_rhs = try_option!(range_union(bound.clone(), self.single_range.clone())); // Renamed range to range_rhs
+                        rhs = match self.gen_iter(rnoprand, rnoprand-1, range_rhs) {
                             Some(v) => v,
                             None => return None,
                         };
 
-                        r = rhs.eval();
-                        let range = (self.minus_range.start+r)..(self.minus_range.end+r);
-                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                        r_eval = rhs.eval();
+                        let range_lhs = (self.minus_range.start+r_eval)..(self.minus_range.end+r_eval); // Renamed range to range_lhs
+                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range_lhs) {
                             Some(v) => v,
                             None => return None,
                         };
                     },
-                    _ => {
-                        let range = try_option!(range_union(bound.clone(), self.single_range.clone()));
-                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range) {
+                    _ => { // Add and default case
+                        let range_lhs = try_option!(range_union(bound.clone(), self.single_range.clone())); // Renamed range to range_lhs
+                        lhs = match self.gen_iter(lnoprand, lnoprand-1, range_lhs) {
                             Some(v) => v,
                             None => return None,
                         };
 
-                        l = lhs.eval();
-                        let range = (self.add_range.start-l)..(self.add_range.end-l);
-                        rhs = match self.gen_iter(rnoprand, rnoprand-1, range) {
+                        l_eval = lhs.eval();
+                        let range_rhs = (self.add_range.start-l_eval)..(self.add_range.end-l_eval); // Renamed range to range_rhs
+                        rhs = match self.gen_iter(rnoprand, rnoprand-1, range_rhs) {
                             Some(v) => v,
                             None => return None,
                         };
@@ -375,12 +391,12 @@ impl GenerativeMathGen {
     }
 
     pub fn rand(&mut self, r: Range<i32>) -> i32 {
-        self.rng.gen_range(r.start, r.end)
+        self.rng.gen_range(r.start, r.end) 
     }
 
 
     pub fn rand_op(&mut self) -> Op {
-        match self.rng.gen_range(0, 4) {
+        match self.rng.gen_range(0, 4) { 
             3 => Op::Add,
             1 => Op::Minus,
             2 => Op::Mul,
@@ -551,7 +567,7 @@ mod tests {
         let now = std::time::Instant::now();
         let mut g = GenerativeMathGen::new();
         (0..1000).for_each(|_| {
-            eprintln!("{}", g.gen(3, 2));
+            eprintln!("{}", g.gen(3, 2)); // This will now print to stderr
             g.gen(3, 2); 
         });
         eprintln!("duration: {}", now.elapsed().as_millis());

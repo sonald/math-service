@@ -2,9 +2,9 @@
 name = "math-service"
 version = "0.1.0"
 authors = ["Sian Cao <yinshuiboy@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 futures = "0.1"
 tokio = "*"
-rdkafka = "0.21"
+rdkafka = "0.28.0"
