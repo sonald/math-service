@@ -2,7 +2,7 @@
 name = "mathgen"
 version = "0.1.0"
 authors = ["Sian Cao <yinshuiboy@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 rand = "0.6"

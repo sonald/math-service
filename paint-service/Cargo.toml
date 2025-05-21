@@ -2,7 +2,7 @@
 name = "paint-service"
 version = "0.1.0"
 authors = ["Sian Cao <yinshuiboy@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["local"]
@@ -13,18 +13,20 @@ service = []
 [dependencies]
 mathgen = { path = "../mathgen" }
 paint-math = { path = "../paint-math" }
-rand = "0.6"
-actix-web = "0.7"
-env_logger = "0.5"
-dotenv = "0.13"
-log = "0.4"
+rand = "0.8"
+actix-web = "=4.4.0"
+env_logger = "=0.9.0"
+dotenv = "0.15"
+log = "0.4.20"
 
-diesel = {version = "1.4", features = ["postgres", "sqlite"]}
+diesel = {version = "=2.1.0", features = ["postgres", "sqlite", "r2d2"]}
 
-r2d2 = "0.8.2"
-r2d2-diesel = "1.0.0"
+r2d2 = "0.8.10"
+# r2d2-diesel = "1.0.0" # Removing this, will use diesel's built-in r2d2 feature
 
-serde = "*"
-serde_derive = "*"
+serde = { version = "1.0", features = ["derive"] }
+# serde_derive = "1.0" # No longer needed when using serde's derive feature
 
-futures = "*"
+futures = "0.3"
+url = "=2.4.1"
+actix-files = "0.6"
