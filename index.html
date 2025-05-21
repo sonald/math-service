@@ -30,7 +30,7 @@
         <h1 class="cover-heading">Math Exam Generator</h1>
         
         <div class="mx-auto">
-          <form action="/apps/math/" method="POST" enctype="application/x-www-form-urlencoded">
+          <form action="/generate_math_params" method="GET">
             <div class="form-group row justify-content-center">
               <label class="col-sm-1 col-form-label" for="title"> Title </label>
 
@@ -49,7 +49,7 @@
               </div>
             </div>
 
-            <div class="form-group row justify-content-center">
+            <div class="form-group row justify-content-center" style="display:none;">
               <label class="col-sm-1 col-form-label" for="range"> Range </label>
               <div class="col-sm-4">
                 <input type="text" class="form-control" id="range" name="range" 
@@ -57,7 +57,7 @@
               </div>
             </div>
 
-            <div class="form-group row justify-content-center">
+            <div class="form-group row justify-content-center" style="display:none;">
               <span class="col-sm-1">type</span>
 
               <div class="col-sm-1 form-check">
@@ -67,7 +67,7 @@
 
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="kind" id="kindPNG" value="png">
-                <label class="form-check-label" for="kindPDF">PNG</label>
+                <label class="form-check-label" for="kindPNG">PNG</label> 
               </div>
             </div>
 
@@ -77,8 +77,8 @@
 
         <p class="lead p-3">
           <span>or with defaults: </span>
-          <a href="pdf" class="btn btn btn-lg btn-info">pdf</a>
-          <a href="png" class="btn btn-lg btn-success">png</a>          
+          <a href="/generate_math" class="btn btn btn-lg btn-info">pdf</a>
+          <a href="/generate_math_png" class="btn btn-lg btn-success">png</a>          
         </p>
       </main>
 
